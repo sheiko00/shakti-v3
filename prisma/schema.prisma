@@ -1,0 +1,468 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  password           String
+  isActive           Boolean  @default(true)
+  hashedRefreshToken String?
+  roleId             String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  role               Role                 @relation(fields: [roleId], references: [id])
+  createdOrders      Order[]              @relation("OrderCreator")
+  assignedOrders     Order[]              @relation("OrderAssignee")
+  statusChanges      OrderStatusHistory[]
+  authoredNotes      OrderNote[]
+  productionBatches  ProductionBatch[]    @relation("SupplierBatches")
+  productionNotes    ProductionNote[]
+  uploadedAssets     Asset[]
+  marketingCampaigns Campaign[]           @relation("CampaignOwner")
+  supplierPayouts    SupplierPayout[]     @relation("SupplierPayouts")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. "FOUNDER", "OPERATIONS_MANAGER"
+  permissions String[]
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  users       User[]
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  name           String
+  slug           String   @unique
+  brand          String?
+  category       String?
+  description    String?
+  status         ProductStatus @default(DRAFT)
+  basePrice      Float
+  cost           Float?
+  currency       String   @default("USD")
+  tags           String[]
+  coverImageUrl  String?
+  galleryUrls    String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  variants       ProductVariant[]
+  orderItems     OrderItem[]
+  campaigns      CampaignProduct[]
+}
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model ProductVariant {
+  id            String   @id @default(uuid())
+  productId     String
+  sku           String   @unique
+  attributes    Json     // e.g., {"color": "black", "size": "M"}
+  price         Float?   // Override base price if not null
+  stockQuantity Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems    OrderItem[]
+}
+
+enum OrderStatus {
+  NEW
+  APPROVED
+  IN_PRODUCTION
+  READY
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  orderNumber     String      @unique
+  customerName    String
+  customerPhone   String?
+  customerEmail   String?
+  shippingAddress String?
+  country         String?
+  paymentMethod   String?
+  subtotal        Float
+  shippingCost    Float       @default(0)
+  total           Float
+  currency        String      @default("USD")
+  status          OrderStatus @default(NEW)
+  isDeleted       Boolean     @default(false)
+  createdById     String
+  assignedToId    String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  createdBy       User        @relation("OrderCreator", fields: [createdById], references: [id])
+  assignedTo      User?       @relation("OrderAssignee", fields: [assignedToId], references: [id])
+  items           OrderItem[]
+  statusHistory   OrderStatusHistory[]
+  notes           OrderNote[]
+  shipments       Shipment[]
+  promoCodeId     String?
+  
+  promoCode       PromoCode?  @relation(fields: [promoCodeId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([isDeleted])
+}
+
+model OrderItem {
+  id            String         @id @default(uuid())
+  orderId       String
+  productId     String
+  variantId     String
+  quantity      Int
+  price         Float
+  
+  order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id])
+  variant       ProductVariant @relation(fields: [variantId], references: [id])
+  productionItems ProductionBatchItem[]
+}
+
+model OrderStatusHistory {
+  id             String       @id @default(uuid())
+  orderId        String
+  status         OrderStatus
+  previousStatus OrderStatus?
+  changedById    String
+  notes          String?
+  createdAt      DateTime     @default(now())
+
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy      User         @relation(fields: [changedById], references: [id])
+}
+
+model OrderNote {
+  id        String   @id @default(uuid())
+  orderId   String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+}
+
+enum ProductionStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+model ProductionBatch {
+  id          String           @id @default(uuid())
+  batchNumber String           @unique
+  supplierId  String
+  status      ProductionStatus @default(PENDING)
+  cost        Float            @default(0)
+  currency    String           @default("USD")
+  deadline    DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  supplier    User             @relation("SupplierBatches", fields: [supplierId], references: [id])
+  items       ProductionBatchItem[]
+  notes       ProductionNote[]
+  expenses    Expense[]
+
+  @@index([status])
+}
+
+model ProductionBatchItem {
+  id          String          @id @default(uuid())
+  batchId     String
+  orderItemId String
+  quantity    Int
+
+  batch       ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem       @relation(fields: [orderItemId], references: [id])
+}
+
+model ProductionNote {
+  id          String          @id @default(uuid())
+  batchId     String
+  authorId    String
+  content     String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  batch       ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  author      User            @relation(fields: [authorId], references: [id])
+}
+
+enum ShipmentStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED_DELIVERY
+  RETURNED
+}
+
+enum ReturnReason {
+  CUSTOMER_REJECTED
+  WRONG_ADDRESS
+  UNREACHABLE
+  DAMAGED
+  FAILED_DELIVERY
+  OTHER
+}
+
+model Shipment {
+  id                    String         @id @default(uuid())
+  orderId               String
+  trackingNumber        String         @unique
+  carrier               String
+  status                ShipmentStatus @default(PENDING)
+  returnReason          ReturnReason?
+  shippingCost          Float          @default(0)
+  currency              String         @default("USD")
+  estimatedDeliveryDate DateTime?
+  actualDeliveryDate    DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  order                 Order          @relation(fields: [orderId], references: [id])
+  events                ShipmentEvent[]
+  expenses              Expense[]
+
+  @@index([status])
+}
+
+model ShipmentEvent {
+  id          String         @id @default(uuid())
+  shipmentId  String
+  status      ShipmentStatus
+  location    String?
+  notes       String?
+  createdAt   DateTime       @default(now())
+
+  shipment    Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+}
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  ARCHIVE
+}
+
+model AssetFolder {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  parentId    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  parent      AssetFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  subFolders  AssetFolder[] @relation("FolderHierarchy")
+  assets      Asset[]
+}
+
+model Asset {
+  id          String        @id @default(uuid())
+  folderId    String?
+  name        String
+  fileUrl     String
+  type        AssetType     @default(IMAGE)
+  size        Int           @default(0) // size in bytes
+  tags        String[]
+  uploadedById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  folder      AssetFolder?  @relation(fields: [folderId], references: [id])
+  uploadedBy  User          @relation(fields: [uploadedById], references: [id])
+  campaigns   CampaignAsset[]
+
+  @@index([folderId])
+  @@index([type])
+}
+
+enum MarketingChannel {
+  META
+  GOOGLE
+  TIKTOK
+  INFLUENCER
+  EMAIL
+  AFFILIATE
+  ORGANIC
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum PromoDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+model Campaign {
+  id          String           @id @default(uuid())
+  name        String
+  objective   String?
+  channel     MarketingChannel
+  budget      Float            @default(0)
+  spent       Float            @default(0)
+  currency    String           @default("USD")
+  startDate   DateTime?
+  endDate     DateTime?
+  status      CampaignStatus   @default(DRAFT)
+  ownerId     String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  owner       User             @relation("CampaignOwner", fields: [ownerId], references: [id])
+  kpi         CampaignKPI?
+  promoCodes  PromoCode[]
+  assets      CampaignAsset[]
+  products    CampaignProduct[]
+  expenses    Expense[]
+
+  @@index([status, channel])
+}
+
+model CampaignKPI {
+  id          String   @id @default(uuid())
+  campaignId  String   @unique
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  cpc         Float    @default(0)
+  ctr         Float    @default(0)
+  cpa         Float    @default(0)
+  revenue     Float    @default(0)
+  roas        Float    @default(0)
+  updatedAt   DateTime @updatedAt
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+}
+
+model PromoCode {
+  id            String            @id @default(uuid())
+  code          String            @unique
+  discountType  PromoDiscountType
+  discountValue Float
+  usageCount    Int               @default(0)
+  usageLimit    Int?
+  expiryDate    DateTime?
+  campaignId    String?
+  isActive      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  campaign      Campaign?         @relation(fields: [campaignId], references: [id])
+  orders        Order[]
+
+  @@index([code])
+}
+
+model CampaignAsset {
+  campaignId  String
+  assetId     String
+  createdAt   DateTime @default(now())
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  asset       Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, assetId])
+}
+
+model CampaignProduct {
+  campaignId  String
+  productId   String
+  createdAt   DateTime @default(now())
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, productId])
+}
+
+enum ExpenseCategory {
+  PRODUCT_COST
+  SHIPPING
+  MARKETING
+  SALARY
+  TOOL
+  PACKAGING
+  FREELANCER
+  OTHER
+}
+
+enum ExpenseStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+model Expense {
+  id                String          @id @default(uuid())
+  title             String
+  amount            Float
+  currency          String          @default("USD")
+  category          ExpenseCategory
+  status            ExpenseStatus   @default(PENDING)
+  date              DateTime        @default(now())
+  notes             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Auto-Sync Relations
+  productionBatchId String?
+  shipmentId        String?
+  campaignId        String?
+
+  productionBatch   ProductionBatch? @relation(fields: [productionBatchId], references: [id])
+  shipment          Shipment?        @relation(fields: [shipmentId], references: [id])
+  campaign          Campaign?        @relation(fields: [campaignId], references: [id])
+
+  @@index([category, status])
+  @@index([date])
+}
+
+model SupplierPayout {
+  id          String        @id @default(uuid())
+  supplierId  String
+  amount      Float
+  currency    String        @default("USD")
+  status      ExpenseStatus @default(PENDING)
+  date        DateTime      @default(now())
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  supplier    User          @relation("SupplierPayouts", fields: [supplierId], references: [id])
+
+  @@index([supplierId, status])
+}
