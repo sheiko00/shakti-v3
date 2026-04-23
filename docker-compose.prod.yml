@@ -1,0 +1,88 @@
+# docker-compose.prod.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Production compose file for the VM.
+# Images are pre-built by GitHub Actions and stored in GHCR.
+# The VM only needs to run:
+#   docker compose pull
+#   docker compose up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: '3.8'
+
+services:
+  # ── PostgreSQL Database ────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: shakti_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - shakti_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── NestJS API ─────────────────────────────────────────────────────────────
+  api:
+    image: ghcr.io/sheiko00/shakti-v3-api:latest
+    container_name: shakti_api
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=3001
+      - CORS_ORIGIN=${CORS_ORIGIN}
+    ports:
+      - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - shakti_network
+
+  # ── Next.js Web App ────────────────────────────────────────────────────────
+  web:
+    image: ghcr.io/sheiko00/shakti-v3-web:latest
+    container_name: shakti_web
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - shakti_network
+
+  # ── Nginx Reverse Proxy ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: shakti_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - web
+      - api
+    networks:
+      - shakti_network
+
+volumes:
+  pgdata:
+
+networks:
+  shakti_network:
+    driver: bridge
