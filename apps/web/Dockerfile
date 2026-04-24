@@ -1,41 +1,38 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# apps/web/Dockerfile  —  Optimized multi-stage build for Next.js Web App
+# apps/web/Dockerfile  —  Next.js Web App (production)
 #
 # IMPORTANT: Requires  output: 'standalone'  in apps/web/next.config.ts
-# This makes the production image tiny by including only what Next.js needs.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Stage 1: Install ALL workspace dependencies ────────────────────────────────
-# We must copy ALL workspace package.json files so that npm workspaces
-# can resolve symlinks correctly before building.
-FROM node:20-alpine AS deps
-WORKDIR /app
-
-COPY .npmrc* ./
-COPY package.json package-lock.json ./
-COPY apps/web/package.json ./apps/web/
-COPY apps/api/package.json ./apps/api/
-COPY packages/types/package.json ./packages/types/
-
-# npm ci respects workspaces and installs all deps including React
-RUN npm ci --legacy-peer-deps
-
-# ── Stage 2: Build Next.js app ────────────────────────────────────────────────
+# ── Stage 1: Build (install + compile in one stage) ───────────────────────────
+# We install and build in the same stage to avoid npm workspace symlink issues.
+# Layer caching is still effective because package files are copied first.
 FROM node:20-alpine AS builder
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copy installed node_modules from deps stage
-COPY --from=deps /app/node_modules ./node_modules
+# Copy .npmrc (legacy-peer-deps=true for React 19 / Next.js 15 compatibility)
+COPY .npmrc* ./
 
-# Copy ALL source so workspace package resolution works
+# Copy ALL workspace manifests first — Docker caches this layer until any
+# package.json changes, so 'npm ci' only re-runs when dependencies change.
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/
+COPY apps/api/package.json ./apps/api/
+COPY packages/types/package.json ./packages/types/
+
+# Install all workspace dependencies (including React, Next.js, etc.)
+RUN npm ci --legacy-peer-deps
+
+# Copy full source code
 COPY . .
 
-# Build Next.js — produces .next/standalone when output:'standalone' is set
+# Build Next.js standalone output
 RUN npm run build -w apps/web
 
-# ── Stage 3: Production runner ────────────────────────────────────────────────
+# ── Stage 2: Production runner ────────────────────────────────────────────────
+# Only the compiled standalone bundle is included — no source, no node_modules.
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -44,11 +41,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup -S shakti && adduser -S shakti -G shakti
 
-# Standalone server bundle
 COPY --from=builder --chown=shakti:shakti /app/apps/web/.next/standalone ./
-# Static assets (JS chunks, CSS)
 COPY --from=builder --chown=shakti:shakti /app/apps/web/.next/static ./apps/web/.next/static
-# Public folder (favicons, images)
 COPY --from=builder --chown=shakti:shakti /app/apps/web/public ./apps/web/public
 
 USER shakti
