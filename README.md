@@ -1,4 +1,4 @@
-# SHAKTI OS V3 🚀
+# SHAKTI OS V3 🚀 [Verified Stabilized]
 
 Shakti OS V3 is an Enterprise-Grade ERP built to manage every aspect of the Shakti business, from the moment a product is conceptualized to the moment it is delivered to the customer, and finally, accurately tracked in the financial books.
 
