@@ -6,7 +6,7 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Copy .npmrc first (contains legacy-peer-deps=true to resolve React 19 conflicts)
+# .npmrc sets legacy-peer-deps=true (needed for React 19 / Next.js 15)
 COPY .npmrc* ./
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
@@ -25,6 +25,7 @@ COPY --from=deps /app/prisma ./prisma
 
 COPY . .
 
+# Generate Prisma client and compile TypeScript
 RUN npx prisma generate
 RUN npm run build -w apps/api
 
@@ -43,8 +44,9 @@ COPY --from=builder /app/prisma ./prisma
 # Install production-only dependencies
 RUN npm ci --omit=dev --legacy-peer-deps
 
-# Re-generate Prisma client in production stage
-RUN npx prisma generate
+# Copy the pre-generated Prisma client from builder (avoids schema validation at build time)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
 RUN addgroup -S shakti && adduser -S shakti -G shakti
 USER shakti
