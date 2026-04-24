@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrderStatus } from '@prisma/client';
 
 const VALID_SHIPMENT_TRANSITIONS: Record<string, string[]> = {
   PENDING: ['PICKED_UP', 'CANCELLED'],
@@ -167,7 +168,7 @@ export class ShippingService {
         where: { id: shipment.orderId },
       });
       if (order) {
-        let newOrderStatus: any = null;
+        let newOrderStatus: OrderStatus | null = null;
 
         // Shipment PICKED_UP -> Order SHIPPED (only if Order is READY)
         if (newStatus === 'PICKED_UP' && order.status === 'READY') {
