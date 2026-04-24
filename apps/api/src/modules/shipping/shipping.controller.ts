@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Patch,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { ShippingService } from './shipping.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -36,6 +46,12 @@ export class ShippingController {
     @Body('notes') notes: string,
     @Request() req: any,
   ) {
-    return this.shippingService.updateStatus(id, status, req.user.userId, returnReason, notes);
+    return this.shippingService.updateStatus(
+      id,
+      status,
+      req.user.userId,
+      returnReason,
+      notes,
+    );
   }
 }

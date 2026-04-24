@@ -7,7 +7,7 @@ export class ProductsService {
 
   async create(data: any) {
     const { variants, ...productData } = data;
-    
+
     return this.prisma.product.create({
       data: {
         ...productData,

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -12,15 +16,15 @@ export class FinanceService {
     const revenueResult = await this.prisma.order.aggregate({
       _sum: { total: true },
       where: {
-        status: { in: ['SHIPPED', 'DELIVERED'] }
-      }
+        status: { in: ['SHIPPED', 'DELIVERED'] },
+      },
     });
     const totalRevenue = revenueResult._sum.total || 0;
 
     // 2. Costs: Sum of all PAID expenses
     const costsResult = await this.prisma.expense.aggregate({
       _sum: { amount: true },
-      where: { status: 'PAID' }
+      where: { status: 'PAID' },
     });
     const totalCosts = costsResult._sum.amount || 0;
 
@@ -31,7 +35,7 @@ export class FinanceService {
     // 4. Marketing Spend (Specific Cost)
     const adSpendResult = await this.prisma.expense.aggregate({
       _sum: { amount: true },
-      where: { status: 'PAID', category: 'MARKETING' }
+      where: { status: 'PAID', category: 'MARKETING' },
     });
     const adSpend = adSpendResult._sum.amount || 0;
 
@@ -59,7 +63,7 @@ export class FinanceService {
         productionBatchId: data.productionBatchId || null,
         shipmentId: data.shipmentId || null,
         campaignId: data.campaignId || null,
-      }
+      },
     });
   }
 
@@ -75,7 +79,7 @@ export class FinanceService {
         productionBatch: { select: { batchNumber: true } },
         shipment: { select: { trackingNumber: true } },
         campaign: { select: { name: true } },
-      }
+      },
     });
   }
 
@@ -85,7 +89,7 @@ export class FinanceService {
 
     return this.prisma.expense.update({
       where: { id },
-      data: { status }
+      data: { status },
     });
   }
 
@@ -99,8 +103,8 @@ export class FinanceService {
       where,
       orderBy: { date: 'desc' },
       include: {
-        supplier: { select: { email: true } }
-      }
+        supplier: { select: { email: true } },
+      },
     });
   }
 }

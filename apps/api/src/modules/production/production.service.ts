@@ -1,13 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 const VALID_BATCH_TRANSITIONS: Record<string, string[]> = {
-  'PENDING': ['ASSIGNED', 'CANCELLED'],
-  'ASSIGNED': ['IN_PROGRESS', 'CANCELLED'],
-  'IN_PROGRESS': ['BLOCKED', 'CANCELLED', 'COMPLETED'], // Added COMPLETED
-  'BLOCKED': ['COMPLETED', 'IN_PROGRESS', 'CANCELLED'],
-  'COMPLETED': [],
-  'CANCELLED': [],
+  PENDING: ['ASSIGNED', 'CANCELLED'],
+  ASSIGNED: ['IN_PROGRESS', 'CANCELLED'],
+  IN_PROGRESS: ['BLOCKED', 'CANCELLED', 'COMPLETED'], // Added COMPLETED
+  BLOCKED: ['COMPLETED', 'IN_PROGRESS', 'CANCELLED'],
+  COMPLETED: [],
+  CANCELLED: [],
 };
 
 @Injectable()
@@ -18,7 +24,7 @@ export class ProductionService {
   async generateBatchNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `PRD-${year}-`;
-    
+
     const latestBatch = await this.prisma.productionBatch.findFirst({
       where: { batchNumber: { startsWith: prefix } },
       orderBy: { createdAt: 'desc' },
@@ -39,7 +45,7 @@ export class ProductionService {
   async create(data: any, userId: string) {
     return this.prisma.$transaction(async (tx) => {
       const batchNumber = await this.generateBatchNumber();
-      
+
       const batch = await tx.productionBatch.create({
         data: {
           batchNumber,
@@ -75,7 +81,7 @@ export class ProductionService {
               where: { id: orderId },
               data: { status: 'IN_PRODUCTION' },
             });
-            
+
             await tx.orderStatusHistory.create({
               data: {
                 orderId,
@@ -87,8 +93,11 @@ export class ProductionService {
             });
           }
         } catch (error) {
-          this.logger.error(`Failed to sync order ${orderId} during batch creation`, error);
-          // We swallow the error for individual orders so the whole transaction doesn't fail 
+          this.logger.error(
+            `Failed to sync order ${orderId} during batch creation`,
+            error,
+          );
+          // We swallow the error for individual orders so the whole transaction doesn't fail
           // just because one order sync failed, though Prisma transactions would rollback if we throw.
           // Since it's within a transaction, we throw if we want strict consistency.
           // User requested: "اعمل transaction مدروسة أو partial handling + logs."
@@ -131,15 +140,15 @@ export class ProductionService {
               include: {
                 product: { select: { name: true, coverImageUrl: true } },
                 variant: { select: { sku: true, attributes: true } },
-                order: { select: { orderNumber: true } }
-              }
-            }
-          }
+                order: { select: { orderNumber: true } },
+              },
+            },
+          },
         },
         notes: {
           include: { author: { select: { email: true } } },
           orderBy: { createdAt: 'desc' },
-        }
+        },
       },
     });
 
@@ -152,11 +161,16 @@ export class ProductionService {
     return batch;
   }
 
-  async updateStatus(id: string, newStatus: any, userId: string, userRole: string) {
+  async updateStatus(
+    id: string,
+    newStatus: any,
+    userId: string,
+    userRole: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
-      const batch = await tx.productionBatch.findUnique({ 
+      const batch = await tx.productionBatch.findUnique({
         where: { id },
-        include: { items: { include: { orderItem: true } } }
+        include: { items: { include: { orderItem: true } } },
       });
       if (!batch) throw new NotFoundException('Batch not found');
 
@@ -165,7 +179,7 @@ export class ProductionService {
       }
 
       const oldStatus = batch.status;
-      
+
       if (oldStatus === newStatus) {
         throw new BadRequestException(`Batch is already ${newStatus}`);
       }
@@ -173,7 +187,9 @@ export class ProductionService {
       if (userRole !== 'FOUNDER') {
         const allowedNextStates = VALID_BATCH_TRANSITIONS[oldStatus] || [];
         if (!allowedNextStates.includes(newStatus)) {
-          throw new BadRequestException(`Invalid transition from ${oldStatus} to ${newStatus}`);
+          throw new BadRequestException(
+            `Invalid transition from ${oldStatus} to ${newStatus}`,
+          );
         }
       }
 
@@ -184,19 +200,21 @@ export class ProductionService {
 
       // SYNC LOGIC: If Batch is COMPLETED, update related orders to READY
       if (newStatus === 'COMPLETED') {
-        const orderIds = [...new Set(batch.items.map(item => item.orderItem.orderId))];
-        
+        const orderIds = [
+          ...new Set(batch.items.map((item) => item.orderItem.orderId)),
+        ];
+
         for (const orderId of orderIds) {
           try {
             const order = await tx.order.findUnique({ where: { id: orderId } });
-            
+
             // STRICT RULE: Only move IN_PRODUCTION to READY. Do not touch others.
             if (order && order.status === 'IN_PRODUCTION') {
               await tx.order.update({
                 where: { id: orderId },
                 data: { status: 'READY' },
               });
-              
+
               await tx.orderStatusHistory.create({
                 data: {
                   orderId,
@@ -208,16 +226,19 @@ export class ProductionService {
               });
             }
           } catch (error) {
-            this.logger.error(`Failed to sync order ${orderId} upon batch completion`, error);
+            this.logger.error(
+              `Failed to sync order ${orderId} upon batch completion`,
+              error,
+            );
           }
         }
 
         // FINANCE AUTO-SYNC: Create Expense for Production Cost
         try {
           const existingExpense = await tx.expense.findFirst({
-            where: { productionBatchId: id }
+            where: { productionBatchId: id },
           });
-          
+
           if (!existingExpense && batch.cost > 0) {
             await tx.expense.create({
               data: {
@@ -228,7 +249,7 @@ export class ProductionService {
                 status: 'PAID', // Or PENDING based on flow, but user wants costs to be tracked, usually production costs are paid or pending supplier payout. Let's set PENDING to track it. Wait, the user said costs are "sum of all PAID expenses". For auto-sync, let's mark it PAID if we assume it's deducted, or PENDING to let them pay the supplier. I'll use PENDING.
                 productionBatchId: id,
                 notes: 'Auto-synced from Production Engine',
-              }
+              },
             });
 
             // Also create Supplier Payout record to track what we owe them
@@ -239,11 +260,14 @@ export class ProductionService {
                 currency: batch.currency,
                 status: 'PENDING',
                 notes: `Payout for batch ${batch.batchNumber}`,
-              }
+              },
             });
           }
         } catch (error) {
-          this.logger.error(`Failed to auto-sync finance for batch ${id}`, error);
+          this.logger.error(
+            `Failed to auto-sync finance for batch ${id}`,
+            error,
+          );
         }
       }
 

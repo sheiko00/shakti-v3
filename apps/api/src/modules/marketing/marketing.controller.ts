@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Patch,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { MarketingService } from './marketing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -19,7 +29,10 @@ export class MarketingController {
 
   @Roles('FOUNDER', 'MARKETING_MANAGER', 'MEDIA_BUYER')
   @Get('campaigns')
-  getCampaigns(@Query('status') status?: string, @Query('channel') channel?: string) {
+  getCampaigns(
+    @Query('status') status?: string,
+    @Query('channel') channel?: string,
+  ) {
     return this.marketingService.getCampaigns(status, channel);
   }
 

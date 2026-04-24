@@ -12,6 +12,8 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/types/package.json ./packages/types/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/utils/package.json ./packages/utils/
 COPY prisma ./prisma/
 
 RUN npm ci --legacy-peer-deps
@@ -38,6 +40,10 @@ ENV NODE_ENV=production
 COPY .npmrc* ./
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/apps/api/package.json ./apps/api/
+COPY --from=builder /app/apps/web/package.json ./apps/web/
+COPY --from=builder /app/packages/types/package.json ./packages/types/
+COPY --from=builder /app/packages/ui/package.json ./packages/ui/
+COPY --from=builder /app/packages/utils/package.json ./packages/utils/
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/prisma ./prisma
 

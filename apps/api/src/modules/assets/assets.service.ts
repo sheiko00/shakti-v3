@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -8,10 +13,13 @@ export class AssetsService {
   // ===================== FOLDERS ===================== //
 
   async createFolder(name: string, parentId?: string) {
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
-    
+    const slug =
+      name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
+
     if (parentId) {
-      const parent = await this.prisma.assetFolder.findUnique({ where: { id: parentId } });
+      const parent = await this.prisma.assetFolder.findUnique({
+        where: { id: parentId },
+      });
       if (!parent) throw new NotFoundException('Parent folder not found');
     }
 
@@ -38,8 +46,14 @@ export class AssetsService {
     const folder = await this.prisma.assetFolder.findUnique({
       where: { id },
       include: {
-        subFolders: { orderBy: { name: 'asc' }, include: { _count: { select: { assets: true } } } },
-        assets: { orderBy: { createdAt: 'desc' }, include: { uploadedBy: { select: { email: true } } } },
+        subFolders: {
+          orderBy: { name: 'asc' },
+          include: { _count: { select: { assets: true } } },
+        },
+        assets: {
+          orderBy: { createdAt: 'desc' },
+          include: { uploadedBy: { select: { email: true } } },
+        },
         parent: true,
       },
     });
@@ -51,7 +65,9 @@ export class AssetsService {
 
   async createAsset(data: any, userId: string) {
     if (data.folderId) {
-      const folder = await this.prisma.assetFolder.findUnique({ where: { id: data.folderId } });
+      const folder = await this.prisma.assetFolder.findUnique({
+        where: { id: data.folderId },
+      });
       if (!folder) throw new NotFoundException('Folder not found');
     }
 
@@ -77,8 +93,8 @@ export class AssetsService {
       where,
       orderBy: { createdAt: 'desc' },
       include: {
-        uploadedBy: { select: { email: true } }
-      }
+        uploadedBy: { select: { email: true } },
+      },
     });
   }
 

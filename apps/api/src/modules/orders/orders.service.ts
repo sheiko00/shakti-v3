@@ -1,15 +1,20 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  'NEW': ['APPROVED', 'CANCELLED'],
-  'APPROVED': ['IN_PRODUCTION', 'CANCELLED', 'READY'], // Founder/Ops can skip to READY
-  'IN_PRODUCTION': ['READY', 'CANCELLED'],
-  'READY': ['SHIPPED'],
-  'SHIPPED': ['DELIVERED', 'RETURNED'],
-  'DELIVERED': [],
-  'CANCELLED': [],
-  'RETURNED': [],
+  NEW: ['APPROVED', 'CANCELLED'],
+  APPROVED: ['IN_PRODUCTION', 'CANCELLED', 'READY'], // Founder/Ops can skip to READY
+  IN_PRODUCTION: ['READY', 'CANCELLED'],
+  READY: ['SHIPPED'],
+  SHIPPED: ['DELIVERED', 'RETURNED'],
+  DELIVERED: [],
+  CANCELLED: [],
+  RETURNED: [],
 };
 
 @Injectable()
@@ -19,7 +24,7 @@ export class OrdersService {
   async generateOrderNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `ORD-${year}-`;
-    
+
     const latestOrder = await this.prisma.order.findFirst({
       where: { orderNumber: { startsWith: prefix } },
       orderBy: { createdAt: 'desc' },
@@ -40,7 +45,7 @@ export class OrdersService {
   async create(data: any, userId: string) {
     return this.prisma.$transaction(async (tx) => {
       const orderNumber = await this.generateOrderNumber();
-      
+
       const order = await tx.order.create({
         data: {
           orderNumber,
@@ -141,11 +146,18 @@ export class OrdersService {
       },
     });
 
-    if (!order || order.isDeleted) throw new NotFoundException('Order not found');
+    if (!order || order.isDeleted)
+      throw new NotFoundException('Order not found');
     return order;
   }
 
-  async updateStatus(id: string, newStatus: any, userId: string, userRole: string, notes?: string) {
+  async updateStatus(
+    id: string,
+    newStatus: any,
+    userId: string,
+    userRole: string,
+    notes?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id } });
       if (!order) throw new NotFoundException('Order not found');
@@ -154,14 +166,18 @@ export class OrdersService {
 
       // 1. Validation: Same status
       if (oldStatus === newStatus) {
-        throw new BadRequestException(`Order is already in ${newStatus} status`);
+        throw new BadRequestException(
+          `Order is already in ${newStatus} status`,
+        );
       }
 
       // 2. Validation: Valid Transition logic
       if (userRole !== 'FOUNDER') {
         const allowedNextStates = VALID_TRANSITIONS[oldStatus] || [];
         if (!allowedNextStates.includes(newStatus)) {
-          throw new BadRequestException(`Invalid transition from ${oldStatus} to ${newStatus}`);
+          throw new BadRequestException(
+            `Invalid transition from ${oldStatus} to ${newStatus}`,
+          );
         }
       }
 
@@ -172,7 +188,9 @@ export class OrdersService {
           !(oldStatus === 'APPROVED' && newStatus === 'IN_PRODUCTION') &&
           !(oldStatus === 'IN_PRODUCTION' && newStatus === 'READY')
         ) {
-          throw new ForbiddenException('Supplier is not allowed to perform this transition');
+          throw new ForbiddenException(
+            'Supplier is not allowed to perform this transition',
+          );
         }
       }
 

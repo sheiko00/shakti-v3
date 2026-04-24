@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Patch,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { FinanceService } from './finance.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -24,7 +33,10 @@ export class FinanceController {
 
   @Roles('FOUNDER', 'OPERATIONS_MANAGER')
   @Get('expenses')
-  getExpenses(@Query('category') category?: string, @Query('status') status?: string) {
+  getExpenses(
+    @Query('category') category?: string,
+    @Query('status') status?: string,
+  ) {
     return this.financeService.getExpenses(category, status);
   }
 

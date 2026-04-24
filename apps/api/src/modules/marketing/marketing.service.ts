@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -21,16 +26,24 @@ export class MarketingService {
           status: 'DRAFT',
           ownerId: userId,
           kpi: {
-            create: {} // Initialize empty KPI
+            create: {}, // Initialize empty KPI
           },
-          assets: data.assetIds?.length > 0 ? {
-            create: data.assetIds.map((assetId: string) => ({ assetId }))
-          } : undefined,
-          products: data.productIds?.length > 0 ? {
-            create: data.productIds.map((productId: string) => ({ productId }))
-          } : undefined,
+          assets:
+            data.assetIds?.length > 0
+              ? {
+                  create: data.assetIds.map((assetId: string) => ({ assetId })),
+                }
+              : undefined,
+          products:
+            data.productIds?.length > 0
+              ? {
+                  create: data.productIds.map((productId: string) => ({
+                    productId,
+                  })),
+                }
+              : undefined,
         },
-        include: { kpi: true, assets: true, products: true }
+        include: { kpi: true, assets: true, products: true },
       });
       return campaign;
     });
@@ -47,8 +60,8 @@ export class MarketingService {
       include: {
         kpi: true,
         owner: { select: { email: true } },
-        _count: { select: { assets: true, products: true, promoCodes: true } }
-      }
+        _count: { select: { assets: true, products: true, promoCodes: true } },
+      },
     });
   }
 
@@ -60,8 +73,8 @@ export class MarketingService {
         promoCodes: true,
         assets: { include: { asset: true } },
         products: { include: { product: true } },
-        owner: { select: { email: true } }
-      }
+        owner: { select: { email: true } },
+      },
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
     return campaign;
@@ -78,7 +91,7 @@ export class MarketingService {
         cpa: data.cpa,
         revenue: data.revenue,
         roas: data.roas,
-      }
+      },
     });
   }
 
@@ -86,7 +99,9 @@ export class MarketingService {
 
   async createPromoCode(data: any) {
     // Check if code exists
-    const existing = await this.prisma.promoCode.findUnique({ where: { code: data.code } });
+    const existing = await this.prisma.promoCode.findUnique({
+      where: { code: data.code },
+    });
     if (existing) throw new BadRequestException('Promo code already exists');
 
     return this.prisma.promoCode.create({
@@ -98,7 +113,7 @@ export class MarketingService {
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         campaignId: data.campaignId || null,
         isActive: true,
-      }
+      },
     });
   }
 
@@ -110,8 +125,8 @@ export class MarketingService {
       where,
       orderBy: { createdAt: 'desc' },
       include: {
-        campaign: { select: { name: true } }
-      }
+        campaign: { select: { name: true } },
+      },
     });
   }
 }

@@ -8,12 +8,12 @@ export class AnalyticsService {
   async getPerformanceMetrics() {
     // 1. Order Stats
     const totalOrders = await this.prisma.order.count({
-      where: { status: { notIn: ['CANCELLED', 'RETURNED'] } }
+      where: { status: { notIn: ['CANCELLED', 'RETURNED'] } },
     });
 
     const revenueResult = await this.prisma.order.aggregate({
       _sum: { total: true },
-      where: { status: { notIn: ['CANCELLED', 'RETURNED'] } }
+      where: { status: { notIn: ['CANCELLED', 'RETURNED'] } },
     });
     const totalRevenue = revenueResult._sum.total || 0;
     const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -24,22 +24,22 @@ export class AnalyticsService {
       _sum: { quantity: true },
       orderBy: { _sum: { quantity: 'desc' } },
       take: 5,
-      where: { order: { status: { notIn: ['CANCELLED', 'RETURNED'] } } }
+      where: { order: { status: { notIn: ['CANCELLED', 'RETURNED'] } } },
     });
 
     const bestSellingProducts = await Promise.all(
       orderItems.map(async (item) => {
         const product = await this.prisma.product.findUnique({
           where: { id: item.productId },
-          select: { name: true, coverImageUrl: true }
+          select: { name: true, coverImageUrl: true },
         });
         return {
           id: item.productId,
           name: product?.name || 'Unknown',
           coverImageUrl: product?.coverImageUrl,
-          quantitySold: item._sum.quantity || 0
+          quantitySold: item._sum.quantity || 0,
         };
-      })
+      }),
     );
 
     // 3. Marketing Channel Performance
@@ -52,7 +52,7 @@ export class AnalyticsService {
       campaigns.map(async (c) => {
         const channelRevenue = await this.prisma.campaignKPI.aggregate({
           _sum: { revenue: true },
-          where: { campaign: { channel: c.channel } }
+          where: { campaign: { channel: c.channel } },
         });
         const rev = channelRevenue._sum.revenue || 0;
         const spent = c._sum.spent || 0;
@@ -62,16 +62,16 @@ export class AnalyticsService {
           channel: c.channel,
           spent,
           revenue: rev,
-          roas: Number(roas.toFixed(2))
+          roas: Number(roas.toFixed(2)),
         };
-      })
+      }),
     );
 
     // 4. Fulfillment Speed (Avg days from APPROVED to DELIVERED)
     // For MVP, we'll just mock a static number or do a simple calculation if we have history.
     // In Prisma, calculating date diffs in groupBy is tricky without raw queries.
     // Let's return a placeholder for now, to be enhanced with RAW SQL later.
-    const avgFulfillmentDays = 3.5; 
+    const avgFulfillmentDays = 3.5;
 
     return {
       totalOrders,

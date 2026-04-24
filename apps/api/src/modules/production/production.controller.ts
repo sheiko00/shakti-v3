@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Patch,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { ProductionService } from './production.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -17,11 +27,12 @@ export class ProductionController {
 
   @Roles('FOUNDER', 'OPERATIONS_MANAGER', 'SUPPLIER')
   @Get()
-  findAll(
-    @Request() req: any,
-    @Query('status') status?: string,
-  ) {
-    return this.productionService.findAll(req.user.role, req.user.userId, status);
+  findAll(@Request() req: any, @Query('status') status?: string) {
+    return this.productionService.findAll(
+      req.user.role,
+      req.user.userId,
+      status,
+    );
   }
 
   @Roles('FOUNDER', 'OPERATIONS_MANAGER', 'SUPPLIER')
@@ -37,6 +48,11 @@ export class ProductionController {
     @Body('status') status: string,
     @Request() req: any,
   ) {
-    return this.productionService.updateStatus(id, status, req.user.userId, req.user.role);
+    return this.productionService.updateStatus(
+      id,
+      status,
+      req.user.userId,
+      req.user.role,
+    );
   }
 }

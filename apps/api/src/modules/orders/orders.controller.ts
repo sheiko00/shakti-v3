@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Param, Patch, Delete, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Patch,
+  Delete,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -41,7 +52,13 @@ export class OrdersController {
     @Body('notes') notes: string,
     @Request() req: any,
   ) {
-    return this.ordersService.updateStatus(id, status, req.user.userId, req.user.role, notes);
+    return this.ordersService.updateStatus(
+      id,
+      status,
+      req.user.userId,
+      req.user.role,
+      notes,
+    );
   }
 
   @Roles('FOUNDER', 'OPERATIONS_MANAGER', 'SUPPLIER')

@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { AssetsService } from './assets.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -13,7 +23,10 @@ export class AssetsController {
 
   @Roles('FOUNDER', 'MARKETING_MANAGER')
   @Post('folders')
-  createFolder(@Body('name') name: string, @Body('parentId') parentId?: string) {
+  createFolder(
+    @Body('name') name: string,
+    @Body('parentId') parentId?: string,
+  ) {
     return this.assetsService.createFolder(name, parentId);
   }
 

@@ -7,7 +7,9 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createFounder(data: any) {
-    const founderRole = await this.prisma.role.findUnique({ where: { name: 'FOUNDER' } });
+    const founderRole = await this.prisma.role.findUnique({
+      where: { name: 'FOUNDER' },
+    });
     if (!founderRole) throw new BadRequestException('Role FOUNDER not found');
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -39,7 +41,7 @@ export class UsersService {
     if (refreshToken) {
       hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
     }
-    
+
     await this.prisma.user.update({
       where: { id: userId },
       data: { hashedRefreshToken },

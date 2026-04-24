@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
@@ -13,7 +17,9 @@ export class AuthService {
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.usersService.findByEmail(email);
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Invalid credentials or inactive account');
+      throw new UnauthorizedException(
+        'Invalid credentials or inactive account',
+      );
     }
     const isMatch = await bcrypt.compare(pass, user.password);
     if (isMatch) {
@@ -50,7 +56,9 @@ export class AuthService {
   async registerFounder(data: any) {
     const count = await this.usersService.countUsers();
     if (count > 0) {
-      throw new BadRequestException('Founder is already registered. Use invite flow.');
+      throw new BadRequestException(
+        'Founder is already registered. Use invite flow.',
+      );
     }
     return this.usersService.createFounder(data);
   }
