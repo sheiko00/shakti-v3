@@ -12,10 +12,10 @@ export class AnalyticsService {
     });
 
     const revenueResult = await this.prisma.order.aggregate({
-      _sum: { totalAmount: true },
+      _sum: { total: true },
       where: { status: { notIn: ['CANCELLED', 'RETURNED'] } }
     });
-    const totalRevenue = revenueResult._sum.totalAmount || 0;
+    const totalRevenue = revenueResult._sum.total || 0;
     const aov = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     // 2. Best Selling Products (by quantity)

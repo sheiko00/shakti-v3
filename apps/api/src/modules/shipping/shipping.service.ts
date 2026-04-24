@@ -143,7 +143,7 @@ export class ShippingService {
       // STRICT SYNC LOGIC: Auto status sync with Order
       const order = await tx.order.findUnique({ where: { id: shipment.orderId } });
       if (order) {
-        let newOrderStatus = null;
+        let newOrderStatus: any = null;
 
         // Shipment PICKED_UP -> Order SHIPPED (only if Order is READY)
         if (newStatus === 'PICKED_UP' && order.status === 'READY') {

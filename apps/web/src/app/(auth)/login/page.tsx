@@ -11,7 +11,10 @@ export default function LoginPage() {
           <p className="text-sm text-neutral-500 tracking-wide uppercase">Operating System</p>
         </div>
 
-        <form action={login} className="space-y-6">
+        <form action={async (formData) => {
+          'use server';
+          await login(formData);
+        }} className="space-y-6">
           <div className="space-y-2">
             <label className="text-xs font-semibold text-neutral-600 uppercase tracking-wider" htmlFor="email">
               Work Email

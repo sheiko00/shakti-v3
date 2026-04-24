@@ -35,7 +35,7 @@ export class UsersService {
   }
 
   async updateRefreshToken(userId: string, refreshToken: string | null) {
-    let hashedRefreshToken = null;
+    let hashedRefreshToken: string | null = null;
     if (refreshToken) {
       hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
     }

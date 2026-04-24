@@ -10,12 +10,12 @@ export class FinanceService {
   async getDashboardSummary() {
     // 1. Revenue: Sum of DELIVERED / SHIPPED orders total amount
     const revenueResult = await this.prisma.order.aggregate({
-      _sum: { totalAmount: true },
+      _sum: { total: true },
       where: {
         status: { in: ['SHIPPED', 'DELIVERED'] }
       }
     });
-    const totalRevenue = revenueResult._sum.totalAmount || 0;
+    const totalRevenue = revenueResult._sum.total || 0;
 
     // 2. Costs: Sum of all PAID expenses
     const costsResult = await this.prisma.expense.aggregate({
@@ -99,7 +99,7 @@ export class FinanceService {
       where,
       orderBy: { date: 'desc' },
       include: {
-        supplier: { select: { email: true, name: true } }
+        supplier: { select: { email: true } }
       }
     });
   }
