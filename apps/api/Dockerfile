@@ -3,60 +3,52 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Stage 1: Install dependencies ─────────────────────────────────────────────
-# Isolating the install step lets Docker reuse this layer as long as
-# package*.json files don't change (fastest possible caching).
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Copy only manifests first so the "npm ci" layer is cached independently
+# Copy .npmrc first (contains legacy-peer-deps=true to resolve React 19 conflicts)
+COPY .npmrc* ./
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/types/package.json ./packages/types/
 COPY prisma ./prisma/
 
-# Install ALL deps (including devDeps needed to build)
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # ── Stage 2: Build ────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Bring installed modules from the deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
 
-# Copy source code
 COPY . .
 
-# Generate Prisma client and compile TypeScript
 RUN npx prisma generate
 RUN npm run build -w apps/api
 
 # ── Stage 3: Production runner ────────────────────────────────────────────────
-# Uses a fresh, minimal image — no devDependencies, no source files.
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Only copy what the runtime needs
+COPY .npmrc* ./
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/prisma ./prisma
 
-# Install production-only dependencies (smaller image)
-RUN npm ci --omit=dev
+# Install production-only dependencies
+RUN npm ci --omit=dev --legacy-peer-deps
 
-# Re-generate Prisma client in the production stage so native binaries match
+# Re-generate Prisma client in production stage
 RUN npx prisma generate
 
-# Drop root privileges for security
 RUN addgroup -S shakti && adduser -S shakti -G shakti
 USER shakti
 
 EXPOSE 3001
 
-# NestJS production start: node dist/main
 CMD ["node", "apps/api/dist/main"]
