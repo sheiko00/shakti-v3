@@ -4,9 +4,7 @@
 # IMPORTANT: Requires  output: 'standalone'  in apps/web/next.config.ts
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Stage 1: Build (install + compile in one stage) ───────────────────────────
-# We install and build in the same stage to avoid npm workspace symlink issues.
-# Layer caching is still effective because package files are copied first.
+# ── Stage 1: Build (install + compile) ────────────────────────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -15,24 +13,29 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Copy .npmrc (legacy-peer-deps=true for React 19 / Next.js 15 compatibility)
 COPY .npmrc* ./
 
-# Copy ALL workspace manifests first — Docker caches this layer until any
-# package.json changes, so 'npm ci' only re-runs when dependencies change.
+# Copy workspace manifests for cache layer
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/api/package.json ./apps/api/
 COPY packages/types/package.json ./packages/types/
 
-# Install all workspace dependencies (including React, Next.js, etc.)
+# Install all workspace deps at root level
 RUN npm ci --legacy-peer-deps
 
-# Copy full source code
+# After hoisted install, Next.js 15 needs react to be resolvable from apps/web.
+# Create a local node_modules link so Next.js module check passes.
+RUN mkdir -p apps/web/node_modules && \
+    ln -sf /app/node_modules/react apps/web/node_modules/react && \
+    ln -sf /app/node_modules/react-dom apps/web/node_modules/react-dom && \
+    ln -sf /app/node_modules/react/jsx-runtime apps/web/node_modules/react/jsx-runtime 2>/dev/null || true
+
+# Copy full source
 COPY . .
 
 # Build Next.js standalone output
 RUN npm run build -w apps/web
 
 # ── Stage 2: Production runner ────────────────────────────────────────────────
-# Only the compiled standalone bundle is included — no source, no node_modules.
 FROM node:20-alpine AS runner
 WORKDIR /app
 
